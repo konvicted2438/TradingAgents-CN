@@ -119,9 +119,70 @@ def _patch_akshare_etf():
     logger.info("✅ [patch] AKShare ETF 补丁已挂载")
 
 
+# ============ 补丁 3：ETF K 线走 Sina（框架默认 stock_zh_a_hist 不接 ETF）============
+def _patch_etf_kline():
+    """ETF 代码 → 用 akshare fund_etf_hist_sina 拉数据 → 复用框架格式化器（保留技术指标）"""
+    from tradingagents.dataflows import data_source_manager
+
+    DSM = data_source_manager.DataSourceManager
+    original_get = DSM.get_stock_data
+
+    def _sina_sym(code):
+        return ("sh" if code[0] == "5" else "sz") + code
+
+    def patched_get_stock_data(self, symbol, start_date=None, end_date=None, period="daily"):
+        if not _is_etf(symbol):
+            return original_get(self, symbol, start_date, end_date, period)
+
+        import datetime as dt
+        import pandas as pd
+        import akshare as ak
+
+        try:
+            df = ak.fund_etf_hist_sina(symbol=_sina_sym(symbol))
+        except Exception as e:
+            logger.warning(f"[patch] ETF Sina 拉数失败 {symbol}: {e}")
+            return original_get(self, symbol, start_date, end_date, period)
+
+        if df is None or df.empty:
+            return original_get(self, symbol, start_date, end_date, period)
+
+        df["date"] = pd.to_datetime(df["date"])
+        # 截取范围（默认最近一年）
+        if not end_date:
+            end_date = dt.date.today().strftime("%Y-%m-%d")
+        if not start_date:
+            start_date = (dt.datetime.strptime(end_date, "%Y-%m-%d") - dt.timedelta(days=365)).strftime("%Y-%m-%d")
+        df = df[(df["date"] >= pd.to_datetime(start_date)) & (df["date"] <= pd.to_datetime(end_date))]
+        df = df.sort_values("date").reset_index(drop=True)
+
+        if df.empty:
+            return f"❌ ETF {symbol} 在 {start_date} - {end_date} 区间无数据"
+
+        # 周期重采样
+        if period == "weekly":
+            df = df.set_index("date").resample("W").agg(
+                {"open":"first","high":"max","low":"min","close":"last","volume":"sum"}
+            ).dropna().reset_index()
+        elif period == "monthly":
+            df = df.set_index("date").resample("M").agg(
+                {"open":"first","high":"max","low":"min","close":"last","volume":"sum"}
+            ).dropna().reset_index()
+
+        stock_name = ETF_NAMES.get(symbol, f"ETF{symbol}")
+        logger.info(f"✅ [patch] ETF K线 (Sina): {symbol} {stock_name}  {len(df)} 行  {df['date'].iloc[0].date()} → {df['date'].iloc[-1].date()}")
+
+        # 复用框架原有的格式化（含 MA/RSI/MACD/BOLL 等技术指标）
+        return self._format_stock_data_response(df, symbol, stock_name, start_date, end_date)
+
+    DSM.get_stock_data = patched_get_stock_data
+    logger.info("✅ [patch] ETF K线 (Sina) 补丁已挂载")
+
+
 def apply_all():
     _patch_memory()
     _patch_akshare_etf()
+    _patch_etf_kline()
 
 
 if __name__ == "__main__":
