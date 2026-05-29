@@ -130,9 +130,15 @@ def _patch_etf_kline():
     def _sina_sym(code):
         return ("sh" if code[0] == "5" else "sz") + code
 
+    def _unwrap(result):
+        """框架 _try_fallback_sources 返回 (str, source) 元组但上层未解包；统一兜底。"""
+        if isinstance(result, tuple) and len(result) >= 1:
+            return result[0]
+        return result
+
     def patched_get_stock_data(self, symbol, start_date=None, end_date=None, period="daily"):
         if not _is_etf(symbol):
-            return original_get(self, symbol, start_date, end_date, period)
+            return _unwrap(original_get(self, symbol, start_date, end_date, period))
 
         import datetime as dt
         import pandas as pd
