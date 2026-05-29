@@ -25,6 +25,10 @@ os.environ.setdefault("OPENAI_API_KEY", "lm-studio")
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
 
+# 本地补丁（必须在 propagate 之前挂载）
+import patches
+patches.apply_all()
+
 
 def main():
     ticker = sys.argv[1] if len(sys.argv) > 1 else "510300"  # 沪深300ETF（指数 000300 数据源不接）
