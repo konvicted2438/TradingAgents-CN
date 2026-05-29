@@ -90,7 +90,7 @@ def main():
     cfg = _config()
     t0 = time.time()
     try:
-        ta = TradingAgentsGraph(debug=False, config=cfg)
+        ta = TradingAgentsGraph(debug=True, config=cfg)
         final_state, decision = ta.propagate(ticker, date)
         elapsed = time.time() - t0
 
