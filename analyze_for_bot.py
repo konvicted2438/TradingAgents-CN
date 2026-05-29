@@ -37,8 +37,9 @@ def _config():
     cfg = DEFAULT_CONFIG.copy()
     cfg["llm_provider"]   = "deepseek"
     cfg["backend_url"]    = "https://api.deepseek.com"
-    cfg["deep_think_llm"] = "deepseek-chat"
-    cfg["quick_think_llm"]= "deepseek-chat"
+    # DeepSeek V4：v4-flash 替代旧 V3/chat；v4-pro 替代 R1/reasoner
+    cfg["deep_think_llm"] = "deepseek-v4-flash"
+    cfg["quick_think_llm"]= "deepseek-v4-flash"
     cfg["max_debate_rounds"]       = 1
     cfg["max_risk_discuss_rounds"] = 1
     cfg["online_tools"]            = False
